@@ -36,6 +36,11 @@ Left to right, at zoom 1. Dark values first, light in parentheses.
 - **Project icons on the space avatars**: in the Spaces list, each space whose
   project has an icon shows it on its 18px avatar (radius 5), in full color.
   Spaces without one keep Herdr's colored letter tile.
+- **Graph button** in the tab bar, right of `+`, when the git-graph mod
+  (github.com/rabeeh-ta/herdr-git-graph) is installed: a 26px pill (radius 6,
+  14px graph icon, "Graph" at 12px, `muted` on `chrome`, `selected` when its
+  panel shows). It opens the side panel (368px) with Git Graph's commit graph of
+  the focused terminal's repository. Without git-graph the button isn't drawn.
 
 ## How it behaves
 
@@ -61,6 +66,10 @@ Left to right, at zoom 1. Dark values first, light in parentheses.
   results live in shared state: a layout or theme change starts a new copy of
   the mod, which inherits them and searches nothing. A project is looked at
   again only when it is new or its result is a day old.
+- **Graph**: clicking the button selects `graph` in the side panel's stack and
+  shows the panel; clicking it again while it shows hides the panel, like Files
+  and Changes. Everything inside the panel is git-graph's own (lanes, labels,
+  checkout on double-click, right-click menus, commit details).
 
 ## Built from
 
@@ -74,13 +83,14 @@ Left to right, at zoom 1. Dark values first, light in parentheses.
     column with `spaces` (mod `spaces-icons`) and `agents` (weight 1, min 90), `sidebar-footer`
     (69px, mod `workspace-chrome`, props `{ "footer": true }`).
   - `work` (column, `resizable: false`): `tabs` (42px, `window_drag`, mod
-    `tabs`); `work-body` row (padding 8, gap 8) with `main`
+    `tabs-graph`); `work-body` row (padding 8, gap 8) with `main`
     (`{ "tab": "active" }`, pane frame gap 8, radius 10, background
     `background`, `lone: true`, border 1 `border`, focus 1 `accent`, header mod
     `pane` 30px top `reveal: "always"`) and hidden `panel` column (368px) with a
     `stack` of `files` and `changes`; `status` (28px, mod `workspace-status`).
-- Mods: `spaces-icons` (below) for the Spaces list, and the shipped
-  `workspace-chrome`, `agents`, `tabs`, `pane`, `files`, `changes`,
+- Mods: `spaces-icons` (below) for the Spaces list, `tabs-graph` (below) for
+  the tab bar, and the shipped
+  `workspace-chrome`, `agents`, `pane`, `files`, `changes`,
   `workspace-status`.
 - `themes/herdr-onedark.json` and `themes/herdr-onelight.json`, from herdr's
   `one-dark` / `one-light` tokens as herdr-desk uses them:
@@ -112,8 +122,30 @@ Left to right, at zoom 1. Dark values first, light in parentheses.
     `panes()` once per render and passes each row its `icon`; `row` draws
     `div().size(18).rounded(5).overflow_hidden().child(image(icon).size(18))`,
     else the original letter tile. Everything else is the shipped `spaces`.
+- `mods/tabs-graph/`: a clone of the shipped `tabs` mod
+  (`herdr-app do mod.clone '{"name":"tabs","as":"tabs-graph"}'`), used by the
+  `tabs` block, following git-graph's `docs/top-bar.md`. Its changes:
+  - `init(_props, cx)` checks once, with `fs.exists`, for
+    `<appHome>/mods/git-graph/main.js` and sets `this.hasGraph`.
+  - The enabled panels become `[...(shared("workspace.panels") ?? ["files",
+    "changes"]), ...(this.hasGraph ? ["graph"] : [])]`.
+  - After the Changes button: `.when(enabled.includes("graph"), el =>
+    el.child(panelButton("graph", "Graph", "mods/git-graph/icons/graph.svg")))`.
+- The `panel-body` stack gets a third child after `files` and `changes`:
+  `{ "id": "graph", "type": "block", "content": { "mod": "git-graph" } }`.
+- `mods/git-graph/` itself isn't in this repo: install it from
+  github.com/rabeeh-ta/herdr-git-graph (MIT). It runs `git` in the focused
+  repository, reads the repositories open in other spaces ahead every 15s, and
+  reaches the network only through git (Fetch, Push, deleting a remote branch).
 
 ## Watch out
+
+- Without `mods/git-graph/` the Graph button is hidden but the `graph` block
+  is still in the stack; nothing opens it, so it stays unseen.
+- `tabs-graph` is a frozen copy of Herdr 0.1.10's `tabs`: a Herdr release that
+  changes the tab bar won't reach it. Clone `tabs` again and redo the three edits.
+- Each layout keeps its own panel state: opening Graph in one layout doesn't open
+  it in another.
 
 - `spaces-icons` reads files outside its own folder (the projects of your
   spaces) and runs a program to copy PNG icons (`cmd /c copy` on Windows,
@@ -162,3 +194,6 @@ Left to right, at zoom 1. Dark values first, light in parentheses.
 - A space whose repo has `src-tauri/icons/128x128.png` shows that picture on its
   avatar within about 10 seconds, and `data/spaces-icons/` holds a non-empty copy;
   a space with no icon file shows its colored letter.
+- `herdr-app check mods/tabs-graph` passes. With git-graph installed, Graph
+  shows in the tab bar and opens a commit graph of the focused terminal's repo
+  (`Not a git repository` outside one); with it removed, the button is gone.
